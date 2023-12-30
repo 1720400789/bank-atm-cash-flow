@@ -19,3 +19,5 @@ org.zj.atm.framework.starter.bases.config.ApplicationBaseAutoConfiguration
 org.zj.atm.framework.starter.database.config.MybatisPlusAutoConfiguration
 org.zj.atm.framework.starter.distributedid.config.DistributedIdAutoConfiguration
 org.zj.atm.framework.starter.convention.config.WebAutoConfiguration
+org.zj.atm.framework.starter.designpattern.config.DesignPatternAutoConfiguration
+org.zj.atm.framework.starter.biz.user.config.UserAutoConfiguration
