@@ -1,0 +1,53 @@
+spring:
+  cloud:
+    gateway:
+      # 配置路由
+      routes:
+        # 第一个路由
+        # 路由的唯一 id
+        - id: index12306-user-aggregation-service
+          # 要是这个聚合服务的配置文件看着有点懵可以看 application-dev.yaml
+          # 表示将符合 /api/user-service/** 路径的请求转发到名为 index12306-aggregation 的负载均衡服务，并附加 /api/user-service/** 前缀
+          uri: lb://index12306-aggregation${unique-name:}-service/api/user-service/**
+          # 定义路由断言，请求的路径必须匹配 /api/user-service/** 才会触发此路由
+          predicates:
+            - Path=/api/user-service/**
+          # 定义过滤器
+          filters:
+            # 过滤器名字为 TokenValidate
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/user-service/passenger
+                  - /api/user-service/query
+                  - /api/user-service/logout
+                  - /api/user-service/deletion
+
+        - id: index12306-ticket-aggregation-service
+          uri: lb://index12306-aggregation${unique-name:}-service/api/ticket-service/**
+          predicates:
+            - Path=/api/ticket-service/**
+          filters:
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/ticket-service/ticket/purchase
+                  - /api/ticket-service/ticket/pay/query
+                  - /api/ticket-service/ticket/cancel
+
+        - id: index12306-pay-aggregation-service
+          # 表示将符合 /api/pay-service/** 路径的请求转发到名为 index12306-aggregation 的负载均衡服务，并附加 /api/pay-service/** 前缀
+          uri: lb://index12306-aggregation${unique-name:}-service/api/pay-service/**
+          predicates:
+            - Path=/api/pay-service/**
+
+        - id: index12306-order-aggregation-service
+          uri: lb://index12306-aggregation${unique-name:}-service/api/order-service/**
+          predicates:
+            - Path=/api/order-service/**
+          filters:
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/order-service/order/ticket/query
+                  - /api/order-service/order/ticket/self/page

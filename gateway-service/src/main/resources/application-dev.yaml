@@ -1,0 +1,42 @@
+spring:
+  cloud:
+    gateway:
+      # 配置路由
+      routes:
+        # 第一个路由
+        # 路由的唯一 id
+        - id: atm-admin-service
+          # 表示将符合 /api/admin-service/** 路径的请求转发到名为 atm-user 的负载均衡服务，并附加 /api/admin-service/** 前缀
+          uri: lb://atm-admin-service
+          # 定义路由断言，请求的路径必须匹配 /api/admin-service/** 才会触发此路由
+          predicates:
+            - Path=/api/atm/admin-service/**
+          filters:
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/admin-service/passenger
+                  - /api/admin-service/query
+                  - /api/admin-service/logout
+                  - /api/admin-service/deletion
+        - id: atm-user-service
+          uri: lb://atm-user-service/api/atm/user-service/**
+          predicates:
+            - Path=/api/atm/user-service/**
+          filters:
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/atm/user-service/ticket/purchase
+                  - /api/atm/user-service/ticket/pay/query
+                  - /api/atm/user-service/ticket/cancel
+        - id: atm-project-service
+          uri: lb://atm-project-service
+          predicates:
+            - Path=/api/atm/project-service/**
+          filters:
+            - name: TokenValidate
+              args:
+                blackPathPre:
+                  - /api/order-service/order/ticket/query
+                  - /api/order-service/order/ticket/self/page
