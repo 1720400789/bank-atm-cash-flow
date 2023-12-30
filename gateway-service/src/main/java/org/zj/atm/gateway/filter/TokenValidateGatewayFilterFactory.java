@@ -1,20 +1,3 @@
-/*
- * Licensed to the Apache Software Foundation (ASF) under one or more
- * contributor license agreements.  See the NOTICE file distributed with
- * this work for additional information regarding copyright ownership.
- * The ASF licenses this file to You under the Apache License, Version 2.0
- * (the "License"); you may not use this file except in compliance with
- * the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.zj.atm.gateway.filter;
 
 import com.alibaba.nacos.client.naming.utils.CollectionUtils;
@@ -24,11 +7,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
-import org.zj.atm.gateway.common.constant.UserConstant;
+import org.zj.atm.framework.starter.bases.constant.UserConstant;
+import org.zj.atm.framework.starter.biz.user.core.UserInfoDTO;
+import org.zj.atm.framework.starter.biz.user.toolkit.JWTUtil;
 import org.zj.atm.gateway.config.Config;
-import org.zj.atm.gateway.toolkit.JWTUtil;
-import org.zj.atm.gateway.toolkit.UserInfoDTO;
-
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -75,8 +57,9 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
                 // 要注意的是，mutate 方法返回的是一个新的、不可变（immutable）的对象，这个对象是当前对象的一个副本，并且允许对副本进行修改，而不会改变原始对象的状态
                 // 所以 mutate 返回的实例副本是可修改的，并且这种修改不会影响到原来的实例
                 ServerHttpRequest.Builder builder = exchange.getRequest().mutate().headers(httpHeaders -> {
+                    // 将 Token 中的
                     httpHeaders.set(UserConstant.USER_ID_KEY, userInfo.getUserId());
-                    httpHeaders.set(UserConstant.USER_NAME_KEY, userInfo.getUsername());
+                    httpHeaders.set(UserConstant.CARD_ID_KEY, userInfo.getCardId());
                     httpHeaders.set(UserConstant.REAL_NAME_KEY, URLEncoder.encode(userInfo.getRealName(), StandardCharsets.UTF_8));
                     if (Objects.equals(requestPath, DELETION_PATH)) {
                         httpHeaders.set(UserConstant.USER_TOKEN_KEY, token);
