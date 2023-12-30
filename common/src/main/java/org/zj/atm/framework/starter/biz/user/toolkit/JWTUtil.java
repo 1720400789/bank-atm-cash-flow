@@ -1,4 +1,4 @@
-package org.zj.atm.gateway.toolkit;
+package org.zj.atm.framework.starter.biz.user.toolkit;
 
 import com.alibaba.fastjson2.JSON;
 import io.jsonwebtoken.Claims;
@@ -7,24 +7,26 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.util.StringUtils;
+import org.zj.atm.framework.starter.biz.user.core.UserInfoDTO;
 
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.zj.atm.gateway.common.constant.UserConstant.*;
+import static org.zj.atm.framework.starter.bases.constant.UserConstant.*;
 
 /**
  * JWT 工具类
- *
- * @公众号：马丁玩编程，回复：加群，添加马哥微信（备注：12306）获取项目资料
  */
 @Slf4j
 public final class JWTUtil {
 
+    /**
+     * 60 * 60 * 24 Token 默认过期时间为 24 小时
+     */
     private static final long EXPIRATION = 86400L;
     public static final String TOKEN_PREFIX = "Bearer ";
-    public static final String ISS = "index12306";
+    public static final String ISS = "ATM";
     public static final String SECRET = "SecretKey039245678901232039487623456783092349288901402967890140939827";
 
     /**
@@ -36,22 +38,21 @@ public final class JWTUtil {
     public static String generateAccessToken(UserInfoDTO userInfo) {
         Map<String, Object> customerUserMap = new HashMap<>();
         customerUserMap.put(USER_ID_KEY, userInfo.getUserId());
-        customerUserMap.put(USER_NAME_KEY, userInfo.getUsername());
+        customerUserMap.put(CARD_ID_KEY, userInfo.getCardId());
         customerUserMap.put(REAL_NAME_KEY, userInfo.getRealName());
         String jwtToken = Jwts.builder()
-                // 指定用于签名的算法和密钥（SignatureAlgorithm.HS512 和 SECRET）
+                // 指定用于签名
                 .signWith(SignatureAlgorithm.HS512, SECRET)
-                // 设置 Token 的签发时间为当前时间
+                // 设置签发时间为当前时间
                 .setIssuedAt(new Date())
-                // 设置签发者的信息
+                // 设置签发人信息
                 .setIssuer(ISS)
-                // 设置 JWT 的主题部分，这里将用户信息 Map 转换为 JSON 字符串并作为主题
+                // 设置 JWT 的主题为 customerUserMap
                 .setSubject(JSON.toJSONString(customerUserMap))
-                // 设置 Token 的过期时间为当前时间加上一定的有效期
+                // 设置过期时间
                 .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION * 1000))
-                // 将 JWT 构建为一个字符串
                 .compact();
-        // 对 jwt 口令拼接一个前缀并返回
+        // 对 JWT 口令拼接一个前缀
         return TOKEN_PREFIX + jwtToken;
     }
 
@@ -71,9 +72,9 @@ public final class JWTUtil {
                 //setSigningKey(SECRET) 设置用于验证签名的密钥。
                 //parseClaimsJws 解析传入的 JWT Token，如果解析成功则返回一个包含声明（Claims）的对象 claims。
                 Claims claims = Jwts.parser().setSigningKey(SECRET).parseClaimsJws(actualJwtToken).getBody();
-                // 从 claims 中获取 Token 的过期时间（expiration）。
+                // 到期时间
                 Date expiration = claims.getExpiration();
-                // 如果 Token 的过期时间在当前时间之后（即未过期），则进行下一步；否则，抛出 ExpiredJwtException 异常
+                // 如果没有过期
                 if (expiration.after(new Date())) {
                     String subject = claims.getSubject();
                     return JSON.parseObject(subject, UserInfoDTO.class);
