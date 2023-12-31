@@ -1,5 +1,7 @@
 package org.zj.atm.user.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -9,17 +11,21 @@ import org.redisson.api.RedissonClient;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.zj.atm.framework.starter.convention.exception.RemoteException;
 import org.zj.atm.framework.starter.convention.exception.ServiceException;
 import org.zj.atm.framework.starter.designpattern.chain.AbstractChainContext;
 import org.zj.atm.user.common.enums.UserChainMarkEnum;
 import org.zj.atm.user.dao.entity.UserDO;
 import org.zj.atm.user.dao.mapper.UserMapper;
 import org.zj.atm.user.dto.req.UserRegisterReqDTO;
+import org.zj.atm.user.dto.resp.UserAnonymizedMsg;
 import org.zj.atm.user.service.UserService;
 import org.zj.atm.user.toolkit.HashUtil;
 
+import java.util.Objects;
+
 import static org.zj.atm.user.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
-import static org.zj.atm.user.common.enums.UserRegisterErrorCodeEnum.ID_CARD_REGISTERED;
+import static org.zj.atm.user.common.enums.UserRegisterErrorCodeEnum.*;
 
 /**
  * 用户接口实现层
@@ -49,7 +55,7 @@ public class UserserviceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         boolean tryLock = rLock.tryLock();
         if (! tryLock) {
             // 加锁失败则说明该身份证号正在被其它人注册
-            throw new ServiceException(ID_CARD_REGISTERED);
+            throw new RemoteException(ID_CARD_REGISTERED);
         }
         try {
             UserDO userDO = UserDO.builder()
@@ -61,11 +67,40 @@ public class UserserviceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 userMapper.insert(userDO);
             } catch (DuplicateKeyException dex) {
                 log.error("用户 [{}] 注册身份证 [{}] 重复", requestParam.getRealName(), requestParam.getIdentityId());
-                throw new ServiceException(ID_CARD_REGISTERED);
+                throw new RemoteException(ID_CARD_REGISTERED);
             }
         } finally {
             rLock.unlock();
         }
+    }
+
+    @Override
+    public UserAnonymizedMsg getAnonymized(String identityId) {
+        if (Objects.isNull(identityId)) {
+            throw new RemoteException(ID_CARD_NOTNULL);
+        }
+        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getIdentityId, identityId);
+        UserDO userDO = userMapper.selectOne(queryWrapper);
+        // 如果查询不到，则说明用户未办过卡或用户已销户
+        if (Objects.isNull(userDO)) {
+            throw new RemoteException(USER_IS_NULL);
+        }
+        // 如果查询得到并且 freezeFlag == 1则说明用户已冻结
+        if (userDO.getFreezeFlag() == 1) {
+            throw new RemoteException(USER_FREEZED);
+        }
+
+        return UserAnonymizedMsg.builder()
+                .userId(userDO.getId())
+                .realName(userDO.getRealName())
+                .identityId(userDO.getIdentityId())
+                .address(userDO.getAddress())
+                .phone(userDO.getPhone())
+                .gender(userDO.getGender())
+                .deletionTime(userDO.getDeletionTime())
+                .freezeTime(userDO.getFreezeTime())
+                .build();
     }
 
     /**

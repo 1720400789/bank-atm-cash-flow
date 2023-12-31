@@ -1,0 +1,47 @@
+server:
+  port: 9103
+  servlet:
+    context-path:
+
+atm:
+  user-service:
+    lazy-init: true
+    if_test: true
+  debit_card:
+    # 本银行银行卡号前缀
+    bank_card_prefix: 620101
+    # 本银行单人持卡上限
+    card_num_single_man: 4
+    rate: 0.00090000
+
+spring:
+  application:
+    name: atm-project-service
+  datasource:
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
+  data:
+    redis:
+      host: 192.168.58.100
+      port: 6379
+      password: 123456
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 192.168.58.100:8848
+      password: nacos
+      username: nacos
+
+mybatis-plus:
+  global-config:
+    # 开启 delFlag 为逻辑删除字段,每次查询会带上
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+framework:
+  fastjson:
+    safa-mode: true

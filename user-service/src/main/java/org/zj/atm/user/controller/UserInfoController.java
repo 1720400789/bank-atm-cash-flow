@@ -2,13 +2,11 @@ package org.zj.atm.user.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.convention.result.Results;
 import org.zj.atm.user.dto.req.UserRegisterReqDTO;
+import org.zj.atm.user.dto.resp.UserAnonymizedMsg;
 import org.zj.atm.user.service.UserService;
 
 /**
@@ -32,4 +30,10 @@ public class UserInfoController {
         userService.register(requestParam);
         return Results.success();
     }
+
+    @GetMapping("/v1/get-anonymized")
+    public Result<UserAnonymizedMsg> getAnonymized(@RequestParam("identityId") String identityId) {
+        return Results.success(userService.getAnonymized(identityId));
+    }
+
 }

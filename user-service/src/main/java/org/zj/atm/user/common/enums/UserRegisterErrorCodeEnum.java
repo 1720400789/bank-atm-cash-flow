@@ -41,7 +41,11 @@ public enum UserRegisterErrorCodeEnum implements IErrorCode {
 
     VERIFY_STATE_NOTNULL("A006014", "审核状态不能为空"),
 
-    REAL_NAME_NOTNULL("A006015", "真实姓名不能为空");
+    REAL_NAME_NOTNULL("A006015", "真实姓名不能为空"),
+
+    USER_IS_NULL("A006016", "用户不存在"),
+
+    USER_FREEZED("A006017", "用户已冻结，请询问前台柜员");
 
     /**
      * 错误码

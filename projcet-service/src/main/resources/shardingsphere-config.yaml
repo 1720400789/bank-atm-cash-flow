@@ -1,0 +1,77 @@
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/atm?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: 6y7u8i9o@cn
+
+rules:
+  - !SHARDING
+    tables:
+      t_debit_card:
+        actualDataNodes: ds_${0}.t_debit_card_${0}
+        databaseStrategy:
+          standard:
+            shardingColumn: identity_id
+            shardingAlgorithmName: debit_card_database_hash_mod
+        tableStrategy:
+          standard:
+            shardingColumn: identity_id
+            shardingAlgorithmName: debit_card_table_hash_mod
+      t_debit_card_goto:
+        actualDataNodes: ds_${0}.t_debit_card_goto_${0}
+        databaseStrategy:
+          standard:
+            shardingColumn: debit_card_id
+            shardingAlgorithmName: debit_card_database_hash_mod
+        tableStrategy:
+          standard:
+            shardingColumn: debit_card_id
+            shardingAlgorithmName: debit_card_table_hash_mod
+    shardingAlgorithms:
+      debit_card_database_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 1
+      debit_card_table_hash_mod:
+        type: HASH_MOD
+        props:
+          sharding-count: 1
+  - !ENCRYPT
+    tables:
+      t_debit_card:
+        columns:
+          debit_card_id:
+            cipherColumn: debit_card_id
+            encryptorName: common_encryptor
+          pwd:
+            cipherColumn: pwd
+            encryptorName: common_encryptor
+          identity_id:
+            cipherColumn: identity_id
+            encryptorName: common_encryptor
+          phone:
+            cipherColumn: phone
+            encryptorName: common_encryptor
+          initial_balance:
+            cipherColumn: initial_balance
+            encryptorName: common_encryptor
+          account_balance:
+            cipherColumn: account_balance
+            encryptorName: common_encryptor
+      t_debit_card_goto:
+        columns:
+          debit_card_id:
+            cipherColumn: debit_card_id
+            encryptorName: common_encryptor
+          identity_id:
+            cipherColumn: identity_id
+            encryptorName: common_encryptor
+    encryptors:
+      common_encryptor:
+        type: AES
+        props:
+          aes-key-value: d6oadClrrb9A3GWo
+props:
+  sql-show: true
