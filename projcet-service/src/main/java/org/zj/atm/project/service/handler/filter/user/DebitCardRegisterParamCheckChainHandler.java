@@ -33,6 +33,8 @@ public final class DebitCardRegisterParamCheckChainHandler implements DebitCardR
             throw new ClientException(DebitCardErrorCodeEnum.ID_CARD_VERIFY_ERROR);
         } else if (Objects.isNull(requestParam.getPwd())) {
             throw new ClientException(DebitCardErrorCodeEnum.PASSWORD_NOTNULL);
+        } else if (!IdentityVerify.checkStrLength(requestParam.getPwd(), 6)) {
+            throw new ClientException(DebitCardErrorCodeEnum.PASSWORD_MUST_SIX);
         } else if (!IdentityVerify.checkAge(requestParam.getIdentityId())) {
             throw new ClientException(DebitCardErrorCodeEnum.AGE_TOO_YOUNG);
         }

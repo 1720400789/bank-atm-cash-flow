@@ -21,7 +21,7 @@ import org.zj.atm.framework.starter.database.base.BaseDO;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class DebitCardGotoDO implements Serializable {
+public class DebitCardGotoDO extends BaseDO implements Serializable {
     /**
      * 主键ID
      */
@@ -39,6 +39,9 @@ public class DebitCardGotoDO implements Serializable {
      */
     @TableField(value = "identity_id")
     private String identityId;
+
+    @TableField(value = "deletion_time")
+    private String deletionTime;
 
     @TableField(exist = false)
     private static final long serialVersionUID = 1L;

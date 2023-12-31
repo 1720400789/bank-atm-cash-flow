@@ -11,7 +11,7 @@ public enum DebitCardErrorCodeEnum implements IErrorCode {
 
     USER_REGISTER_FAIL("A006000", "用户注册失败"),
 
-    USER_NAME_NOTNULL("A006001", "用户名不能为空"),
+    PASSWORD_MUST_SIX("A006001", "密码必须为6位"),
 
     PASSWORD_NOTNULL("A006002", "密码不能为空"),
 
@@ -51,9 +51,12 @@ public enum DebitCardErrorCodeEnum implements IErrorCode {
 
     DEBIT_CARD_NUM_BEYOND_UPPER_LIMIT("A006102", "持卡数量以达上限"),
 
-    DEBIT_PREFIX_ERROR("A006102", "请管理员检测本行银行卡前缀"),
+    DEBIT_CARD_FREEZED("A006103", "该卡已被冻结，请联系前台柜员"),
+
+    DEBIT_PREFIX_ERROR("B006102", "请管理员检测本行银行卡前缀"),
 
     DEBIT_APPLY_BLOCK("B006100", "申请卡号拥塞，请稍后再试...");
+
     /**
      * 错误码
      */

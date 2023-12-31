@@ -98,7 +98,7 @@ public final class IdentityVerify {
      * @return true - 校验通过<br>
      *         false - 校验不通过
      */
-    private static boolean checkStrLength(String inputString, int len) {
+    public static boolean checkStrLength(String inputString, int len) {
         if (inputString == null || inputString.length() != len) {
             return false;
         }

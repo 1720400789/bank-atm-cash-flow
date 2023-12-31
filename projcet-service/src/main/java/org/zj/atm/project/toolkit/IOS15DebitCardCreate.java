@@ -121,7 +121,7 @@ public class IOS15DebitCardCreate {
             }
             // 如果不为空
             // 将字符串转换为整数并自增1
-            incrementedId = String.valueOf(Integer.parseInt(lastCardId) + 1);
+            incrementedId = String.format("%09d", Integer.parseInt(lastCardId) + 1);
             checkDigit = createCheckDigit((cardPrefix + incrementedId).toCharArray());
             // 将自增后的整数值转换回字符串并设置回 Redis
             stringRedisTemplate.opsForValue().set(DEBIT_CARD_CREATE_LASTEST, incrementedId);

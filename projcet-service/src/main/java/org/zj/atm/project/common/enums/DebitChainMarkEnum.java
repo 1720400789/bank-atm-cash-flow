@@ -8,5 +8,10 @@ public enum DebitChainMarkEnum {
     /**
      * 用户注册银行卡过滤器
      */
-    DEBIT_CARD_REGISTER_FILTER
+    DEBIT_CARD_REGISTER_FILTER,
+
+    /**
+     * 用户使用银行卡登录过滤器
+     */
+    DEBIT_CARD_LOGIN_FILTER;
 }
