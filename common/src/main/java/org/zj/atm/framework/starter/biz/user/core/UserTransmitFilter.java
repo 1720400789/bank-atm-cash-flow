@@ -28,9 +28,9 @@ public class UserTransmitFilter implements Filter {
             }
             String token = httpServletRequest.getHeader(UserConstant.USER_TOKEN_KEY);
             UserInfoDTO userInfoDTO = UserInfoDTO.builder()
-                    .userId(userId)
+                    .userId(Long.valueOf(userId))
                     .realName(realName)
-                    .cardId(cardId)
+                    .cardId(Long.valueOf(cardId))
                     .token(token)
                     .build();
             UserContext.setUser(userInfoDTO);

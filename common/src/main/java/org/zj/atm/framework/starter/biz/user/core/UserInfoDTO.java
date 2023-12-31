@@ -19,12 +19,12 @@ public class UserInfoDTO {
     /**
      * 用户 ID
      */
-    private String userId;
+    private Long userId;
 
     /**
      * 银行卡号对应主键id
      */
-    private String cardId;
+    private Long cardId;
 
     /**
      * 真实姓名

@@ -24,7 +24,7 @@ public final class UserContext {
      *
      * @return 用户 ID
      */
-    public static String getUserId() {
+    public static Long getUserId() {
         UserInfoDTO userInfoDTO = USER_THREAD_LOCAL.get();
         return Optional.ofNullable(userInfoDTO).map(UserInfoDTO::getUserId).orElse(null);
     }
@@ -44,7 +44,7 @@ public final class UserContext {
      *
      * @return 用户银行卡号
      */
-    public static String getCardId() {
+    public static Long getCardId() {
         UserInfoDTO userInfoDTO = USER_THREAD_LOCAL.get();
         return Optional.ofNullable(userInfoDTO).map(UserInfoDTO::getCardId).orElse(null);
     }
