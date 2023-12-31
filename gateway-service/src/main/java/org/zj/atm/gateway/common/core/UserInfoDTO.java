@@ -1,4 +1,4 @@
-package org.zj.atm.gateway.toolkit;
+package org.zj.atm.gateway.common.core;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,15 +17,20 @@ public class UserInfoDTO {
     /**
      * 用户 ID
      */
-    private String userId;
+    private Long userId;
 
     /**
-     * 用户名
+     * 银行卡号对应主键id
      */
-    private String username;
+    private Long cardId;
 
     /**
      * 真实姓名
      */
     private String realName;
+
+    /**
+     * 用户 Token
+     */
+    private String token;
 }

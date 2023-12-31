@@ -7,9 +7,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.stereotype.Component;
-import org.zj.atm.framework.starter.bases.constant.UserConstant;
-import org.zj.atm.framework.starter.biz.user.core.UserInfoDTO;
-import org.zj.atm.framework.starter.biz.user.toolkit.JWTUtil;
+import org.zj.atm.gateway.common.core.UserConstant;
+import org.zj.atm.gateway.common.core.UserInfoDTO;
+import org.zj.atm.gateway.common.toolkit.JWTUtil;
 import org.zj.atm.gateway.config.Config;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -58,8 +58,8 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
                 // 所以 mutate 返回的实例副本是可修改的，并且这种修改不会影响到原来的实例
                 ServerHttpRequest.Builder builder = exchange.getRequest().mutate().headers(httpHeaders -> {
                     // 将 Token 中的
-                    httpHeaders.set(UserConstant.USER_ID_KEY, userInfo.getUserId());
-                    httpHeaders.set(UserConstant.CARD_ID_KEY, userInfo.getCardId());
+                    httpHeaders.set(UserConstant.USER_ID_KEY, String.valueOf(userInfo.getUserId()));
+                    httpHeaders.set(UserConstant.CARD_ID_KEY, String.valueOf(userInfo.getCardId()));
                     httpHeaders.set(UserConstant.REAL_NAME_KEY, URLEncoder.encode(userInfo.getRealName(), StandardCharsets.UTF_8));
                     if (Objects.equals(requestPath, DELETION_PATH)) {
                         httpHeaders.set(UserConstant.USER_TOKEN_KEY, token);
