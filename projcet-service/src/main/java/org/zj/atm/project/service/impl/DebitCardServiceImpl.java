@@ -1,14 +1,21 @@
 package org.zj.atm.project.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.common.collect.Lists;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.zj.atm.framework.starter.biz.user.core.UserContext;
@@ -33,11 +40,13 @@ import org.zj.atm.project.remote.dto.resp.UserActualMsgDTO;
 import org.zj.atm.project.remote.dto.resp.UserAnonymizedMsg;
 import org.zj.atm.project.service.DebitCardService;
 import org.zj.atm.project.toolkit.IOS15DebitCardCreate;
-
+import java.io.PrintWriter;
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-
 import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_CACHE_KEY;
 import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_FAIL_COUNT;
 import static org.zj.atm.project.common.enums.DebitCardErrorCodeEnum.*;
@@ -66,6 +75,11 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
 
     @Value("${atm.login.if_fail.freeze_time}")
     private Long freezeTime;
+
+    @Value("${atm.login.if_fail.threshold}")
+    private Long threshold;
+
+    private static final String COUNT_LOGIN_FAIL_LUA = "lua/countLoginFailLua.lua";
 
     private final UserRemoteService userRemoteService;
 
@@ -195,18 +209,63 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
         if (debitCardGotoDO == null) {
             throw new ServiceException(DEBIT_CARD_REGIX_ERROR);
         }
+        // 这一次根据身份证和银行卡号查，肯定能查到
+        LambdaQueryWrapper<DebitCardDO> queryWrapper2 = Wrappers.lambdaQuery(DebitCardDO.class)
+                .eq(DebitCardDO::getIdentityId, debitCardGotoDO.getIdentityId())
+                .eq(DebitCardDO::getDebitCardId, requestParam.getDebitCardId());
+        DebitCardDO debitCardDO2 = debitCardMapper.selectOne(queryWrapper2);
+        if (debitCardDO2.getCardStatus() == 1) {
+            throw new ServiceException(DEBIT_CARD_FREEZED);
+        }
         // 结合 identityId 去查，防止读扩散
+        // 这一次查 DebitDO 是判断密码对不对，不一定能查到，因为可能密码不对
         LambdaQueryWrapper<DebitCardDO> queryWrapper = Wrappers.lambdaQuery(DebitCardDO.class)
                 .eq(DebitCardDO::getIdentityId, debitCardGotoDO.getIdentityId())
                 .eq(DebitCardDO::getDebitCardId, requestParam.getDebitCardId())
                 .eq(DebitCardDO::getPwd, requestParam.getPwd());
         DebitCardDO debitCardDO = debitCardMapper.selectOne(queryWrapper);
-        // 查询不到，则说明是本行银行卡，但是密码错误，要记录错误次数
-        // TODO 这里考虑使用银行卡号对应主键作为键，先这么做，因为担心用银行卡号作为键不好
-        // 使用 lua 脚本来保证【取值】、【判断值】和【自增值】的原子性
-        stringRedisTemplate.opsForValue().set(String.format(LOGIN_FAIL_COUNT, ));
-        // 如果查询得到但是被冻结了
-        if (debitCardDO != null && debitCardDO.getCardStatus() == 1) {
+        if (Objects.isNull(debitCardDO)) {
+            // 查询不到，则说明是本行银行卡，但是密码错误，要记录错误次数
+            // TODO 这里考虑使用银行卡号对应主键作为键，先这么做，因为担心用银行卡号作为键不好
+            // 使用 lua 脚本来保证【取值】、【判断值】和【自增值】的原子性
+            // 承接 lua 脚本的对象
+            DefaultRedisScript<String> redisScript = new DefaultRedisScript<>();
+            // 设置脚本内容
+            redisScript.setScriptSource(new ResourceScriptSource(new ClassPathResource(COUNT_LOGIN_FAIL_LUA)));
+            // 设置脚本返回值类型
+            redisScript.setResultType(String.class);
+            String res = null;
+            try {
+                // 执行脚本，execute 方法可以看一下源代码，三个参数
+                // - 参数一：lua 脚本对象
+                // - 参数二：keys 集合 这里将银行卡号的主键传入
+                // - 参数三：可变参数 args 这里传入三个 args，arg[1]-阈值 arg[2]-时间 arg[3]-初始值
+                res = stringRedisTemplate.execute(redisScript, List.of(String.format(LOGIN_FAIL_COUNT, debitCardDO2.getId())), threshold.toString(), freezeTime.toString(), "1");
+            } catch (Throwable ex) {
+                log.error("执行用户登录限制LUA脚本出错", ex);
+                throw new ServiceException("识别失败，请稍后再试");
+            }
+            // 如果失败次数达到阈值，则冻结账号并抛出异常
+            if (Long.parseLong(res) >= threshold) {
+                LambdaUpdateWrapper<DebitCardDO> updateWrapper = Wrappers.lambdaUpdate(DebitCardDO.class)
+                        .eq(DebitCardDO::getId, debitCardDO2.getId());
+                DebitCardDO debitCardDO1 = DebitCardDO.builder()
+                        .cardStatus(1)
+                        .build();
+                debitCardMapper.update(debitCardDO1, updateWrapper);
+                throw new ServiceException(DEBIT_LOGIN_FAIL_UPPER);
+            }
+            throw new ServiceException(DEBIT_CARD_LOGIN_MATCH_PWD_FAIL);
+        }
+        // 先判断该卡是否重复登录了
+        Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash().entries(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()));
+        if (CollUtil.isNotEmpty(hasLoginMap)) {
+            // 如果缓存存在，则说明还在登录中，则直接抛出异常
+            throw new ServiceException(DEBIT_CARD_LOGIN_DUPLICATE);
+        }
+        // 如果没有重复登录
+        // 如果查询到了但是被冻结了
+        if (debitCardDO.getCardStatus() == 1) {
             throw new ServiceException(DEBIT_CARD_FREEZED);
         }
 
@@ -223,31 +282,38 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
             throw new ServiceException(ex.getMessage());
         }
 
-        // 如果信息正确
-        if (debitCardDO != null) {
-            UserInfoDTO userInfoDTO = UserInfoDTO.builder()
-                    .userId(userAnonymizedMsg.getUserId())
-                    .realName(userAnonymizedMsg.getRealName())
-                    .cardId(debitCardDO.getId())
-                    .build();
-            // 生成 Token
-            String accessToken = JWTUtil.generateAccessToken(userInfoDTO);
-            DebitCardLoginRespDTO actualRespDTO = DebitCardLoginRespDTO.builder()
-                    .debitCardId(debitCardDO.getDebitCardId())
-                    .identityId(debitCardGotoDO.getIdentityId())
-                    .realName(userAnonymizedMsg.getRealName())
-                    // token 信息包含了用户插卡时的userId和银行卡id，不把其它敏感信息给 token，防止泄露
-                    .accessToken(accessToken)
-                    .build();
+        // 能执行到这里就说明登录信息正确
+        // 则清除记录登录失败次数的缓存
+        stringRedisTemplate.delete(String.format(LOGIN_FAIL_COUNT, debitCardDO.getId()));
+        UserInfoDTO userInfoDTO = UserInfoDTO.builder()
+                .userId(userAnonymizedMsg.getUserId())
+                .realName(userAnonymizedMsg.getRealName())
+                .cardId(debitCardDO.getId())
+                .build();
+        // 生成 Token
+        String accessToken = JWTUtil.generateAccessToken(userInfoDTO);
+        DebitCardLoginRespDTO actualRespDTO = DebitCardLoginRespDTO.builder()
+                .debitCardId(debitCardDO.getDebitCardId())
+                .identityId(debitCardGotoDO.getIdentityId())
+                .realName(userAnonymizedMsg.getRealName())
+                // token 信息包含了用户插卡时的userId和银行卡id，不把其它敏感信息给 token，防止泄露
+                .accessToken(accessToken)
+                .build();
 
-            // 将用户 token 存入分布式缓存，hash表名是银行卡表的主键而不是银行卡号，保证唯一的同时保证敏感信息不外泄, 键是 token，值是序列化的返回对象
-            stringRedisTemplate.opsForHash().put(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), accessToken, JSON.toJSONString(actualRespDTO));
-            // 设置缓存过期时间为 10 分钟
-            // TODO 如果要修改这里的过期时间，记得去 gateway 和 common 服务里面的 JWTUtil 也改一下，保证缓存和token过期时间是差不多的
-            stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), expiryTime, TimeUnit.SECONDS);
-            return actualRespDTO;
+        // 将用户 token 存入分布式缓存，hash表名是银行卡表的主键而不是银行卡号，保证唯一的同时保证敏感信息不外泄, 键是 token，值是序列化的返回对象
+        stringRedisTemplate.opsForHash().put(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), accessToken, JSON.toJSONString(actualRespDTO));
+        // 设置缓存过期时间为 10 分钟
+        // TODO 如果要修改这里的过期时间，记得去 gateway 和 common 服务里面的 JWTUtil 也改一下，保证缓存和token过期时间是差不多的
+        stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), expiryTime, TimeUnit.SECONDS);
+        return actualRespDTO;
+    }
+
+    private void returnJson(HttpServletResponse response, String json) throws Exception {
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType("text/html; charset=utf-8");
+        try (PrintWriter writer = response.getWriter()) {
+            writer.print(json);
         }
-        throw new ServiceException("非本行或密码错误");
     }
 
     /**

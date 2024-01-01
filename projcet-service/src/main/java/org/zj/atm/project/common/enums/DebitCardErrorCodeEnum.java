@@ -53,6 +53,12 @@ public enum DebitCardErrorCodeEnum implements IErrorCode {
 
     DEBIT_CARD_FREEZED("A006103", "该卡已被冻结，请联系前台柜员"),
 
+    DEBIT_LOGIN_FAIL_UPPER("A006104", "24小时内输入密码错误超过3次，该银行卡以被冻结，请等待24小时或联系管理员"),
+
+    DEBIT_CARD_LOGIN_DUPLICATE("A006105", "该银行卡重复登录"),
+
+    DEBIT_CARD_LOGIN_MATCH_PWD_FAIL("A006106", "密码错误"),
+
     DEBIT_PREFIX_ERROR("B006102", "请管理员检测本行银行卡前缀"),
 
     DEBIT_APPLY_BLOCK("B006100", "申请卡号拥塞，请稍后再试...");
