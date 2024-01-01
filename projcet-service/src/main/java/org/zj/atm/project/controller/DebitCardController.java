@@ -2,12 +2,12 @@ package org.zj.atm.project.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.convention.result.Results;
 import org.zj.atm.project.dto.req.DebitCardLoginReqDTO;
 import org.zj.atm.project.dto.req.DebitCardRegisterReqDTO;
+import org.zj.atm.project.dto.resp.CheckHeartBeatRespDTO;
 import org.zj.atm.project.dto.resp.DebitCardLoginRespDTO;
 import org.zj.atm.project.dto.resp.DebitCardRegisterRespDTO;
 import org.zj.atm.project.service.DebitCardService;
@@ -43,8 +43,5 @@ public class DebitCardController {
     public Result<DebitCardLoginRespDTO> loginByCard(@RequestBody DebitCardLoginReqDTO requestParam) {
         return Results.success(debitCardService.login(requestParam));
     }
-
-//    @GetMapping("/v1/check-heartbeat")
-//    public
 
 }

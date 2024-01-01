@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.zj.atm.framework.starter.biz.user.core.UserContext;
 import org.zj.atm.framework.starter.biz.user.core.UserInfoDTO;
 import org.zj.atm.framework.starter.biz.user.toolkit.JWTUtil;
 import org.zj.atm.framework.starter.convention.exception.RemoteException;
@@ -19,14 +20,16 @@ import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.designpattern.chain.AbstractChainContext;
 import org.zj.atm.project.dao.enrity.DebitCardDO;
 import org.zj.atm.project.dao.enrity.DebitCardGotoDO;
+import org.zj.atm.project.dao.enrity.IdToDebitCardDO;
 import org.zj.atm.project.dao.mapper.DebitCardGotoMapper;
 import org.zj.atm.project.dao.mapper.DebitCardMapper;
+import org.zj.atm.project.dao.mapper.IdToDebitCardMapper;
 import org.zj.atm.project.dto.req.DebitCardLoginReqDTO;
 import org.zj.atm.project.dto.req.DebitCardRegisterReqDTO;
-import org.zj.atm.project.dto.resp.DebitCardLoginRespDTO;
-import org.zj.atm.project.dto.resp.DebitCardRegisterRespDTO;
+import org.zj.atm.project.dto.resp.*;
 import org.zj.atm.project.remote.UserRemoteService;
 import org.zj.atm.project.remote.dto.req.UserRegisterReqDTO;
+import org.zj.atm.project.remote.dto.resp.UserActualMsgDTO;
 import org.zj.atm.project.remote.dto.resp.UserAnonymizedMsg;
 import org.zj.atm.project.service.DebitCardService;
 import org.zj.atm.project.toolkit.IOS15DebitCardCreate;
@@ -36,6 +39,7 @@ import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 
 import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_CACHE_KEY;
+import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_FAIL_COUNT;
 import static org.zj.atm.project.common.enums.DebitCardErrorCodeEnum.*;
 import static org.zj.atm.project.common.enums.DebitChainMarkEnum.DEBIT_CARD_LOGIN_FILTER;
 import static org.zj.atm.project.common.enums.DebitChainMarkEnum.DEBIT_CARD_REGISTER_FILTER;
@@ -57,11 +61,19 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
     @Value("${atm.debit_card.rate}")
     private BigDecimal rate;
 
+    @Value("${atm.login.expiry_time}")
+    private Long expiryTime;
+
+    @Value("${atm.login.if_fail.freeze_time}")
+    private Long freezeTime;
+
     private final UserRemoteService userRemoteService;
 
     private final DebitCardMapper debitCardMapper;
 
     private final DebitCardGotoMapper debitCardGotoMapper;
+
+    private final IdToDebitCardMapper idToDebitCardMapper;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -117,11 +129,23 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
                     .address(requestParam.getAddress())
                     .build();
             try {
-                userRemoteService.register(userRegisterReqDTO);
-            } catch (Exception exception) {
-                throw new RemoteException("远程调用注册用户接口失败");
+                Result<Void> result = userRemoteService.register(userRegisterReqDTO);
+                if (!result.isSuccess()) {
+                    throw new RemoteException("用户服务远程调用，新增用户记录失败");
+                }
+            } catch (Throwable exception) {
+                throw new ServiceException("远程调用注册用户接口失败");
             }
         }
+        LambdaQueryWrapper<DebitCardDO> wrapper = Wrappers.lambdaQuery(DebitCardDO.class)
+                .eq(DebitCardDO::getDebitCardId, debitCardId)
+                .eq(DebitCardDO::getCardType, 0);
+        DebitCardDO debitCardDO1 = debitCardMapper.selectOne(wrapper);
+        IdToDebitCardDO cardDO = IdToDebitCardDO.builder()
+                .cardId(debitCardDO1.getId())
+                .debitCardId(debitCardId)
+                .build();
+        idToDebitCardMapper.insert(cardDO);
         // 返回数据集
         DebitCardRegisterRespDTO debitCardRegisterRespDTO = DebitCardRegisterRespDTO.builder()
                 .debitCardId(debitCardId)
@@ -167,7 +191,7 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
         LambdaQueryWrapper<DebitCardGotoDO> wrapper = Wrappers.lambdaQuery(DebitCardGotoDO.class)
                 .eq(DebitCardGotoDO::getDebitCardId, requestParam.getDebitCardId());
         DebitCardGotoDO debitCardGotoDO = debitCardGotoMapper.selectOne(wrapper);
-        // 如果根据银行卡号查询路由表没有记录，则说明银行卡不存在
+        // 如果根据银行卡号查询路由表没有记录，则说明非本行银行卡，直接抛出系统异常
         if (debitCardGotoDO == null) {
             throw new ServiceException(DEBIT_CARD_REGIX_ERROR);
         }
@@ -177,6 +201,10 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
                 .eq(DebitCardDO::getDebitCardId, requestParam.getDebitCardId())
                 .eq(DebitCardDO::getPwd, requestParam.getPwd());
         DebitCardDO debitCardDO = debitCardMapper.selectOne(queryWrapper);
+        // 查询不到，则说明是本行银行卡，但是密码错误，要记录错误次数
+        // TODO 这里考虑使用银行卡号对应主键作为键，先这么做，因为担心用银行卡号作为键不好
+        // 使用 lua 脚本来保证【取值】、【判断值】和【自增值】的原子性
+        stringRedisTemplate.opsForValue().set(String.format(LOGIN_FAIL_COUNT, ));
         // 如果查询得到但是被冻结了
         if (debitCardDO != null && debitCardDO.getCardStatus() == 1) {
             throw new ServiceException(DEBIT_CARD_FREEZED);
@@ -190,10 +218,9 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
             if (!result.isSuccess() || Objects.isNull(userAnonymizedMsg = result.getData())) {
                 throw new RemoteException("用户服务远程调用，根据身份证号获取用户脱敏失败");
             }
-        } catch (Exception ex) {
-            if (ex instanceof RemoteException) {
-                log.error("远程调用用户接口查询脱敏用户信息错误: 请求参数:{}", debitCardDO.getDebitCardId());
-            }
+        } catch (Throwable ex) {
+            log.error("远程调用用户接口查询脱敏用户信息错误: 请求参数:{}", debitCardDO.getDebitCardId());
+            throw new ServiceException(ex.getMessage());
         }
 
         // 如果信息正确
@@ -217,9 +244,82 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
             stringRedisTemplate.opsForHash().put(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), accessToken, JSON.toJSONString(actualRespDTO));
             // 设置缓存过期时间为 10 分钟
             // TODO 如果要修改这里的过期时间，记得去 gateway 和 common 服务里面的 JWTUtil 也改一下，保证缓存和token过期时间是差不多的
-            stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), 10L, TimeUnit.MINUTES);
+            stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, debitCardDO.getId()), expiryTime, TimeUnit.SECONDS);
             return actualRespDTO;
         }
         throw new ServiceException("非本行或密码错误");
+    }
+
+    /**
+     * 检查前端心跳
+     * @return 新的重计时的 Token
+     */
+    @Override
+    public CheckHeartBeatRespDTO checkHeartBeat() {
+        String token = UserContext.getToken();
+        if (Objects.isNull(token)) {
+            throw new ServiceException("恶意请求，请先插卡登录");
+        }
+        // 旧 Token
+        UserInfoDTO oldTokenInfo = JWTUtil.parseJwtToken(token);
+        // 将旧 Token 中的用户信息放入 UserInfoDTO ，准备更新 Token 有效期
+        UserInfoDTO nestestUserInfoDTO = UserInfoDTO.builder()
+                .userId(oldTokenInfo.getUserId())
+                .realName(oldTokenInfo.getRealName())
+                .cardId(oldTokenInfo.getCardId())
+                .build();
+        // 拿到更新有效期后的 token
+        String accessToken = JWTUtil.generateAccessToken(nestestUserInfoDTO);
+        DebitCardActualMsgDTO debitCardActualMsgDTO = getActualDebitCard(nestestUserInfoDTO.getCardId());
+        // 远程调用拿到身份证号码
+        Result<UserActualMsgDTO> result;
+        UserActualMsgDTO userActualMsgDTO = null;
+        try {
+            result = userRemoteService.getActualMsgById(oldTokenInfo.getUserId());
+            if (!result.isSuccess() || Objects.isNull(userActualMsgDTO = result.getData())) {
+                throw new RemoteException("用户服务远程调用,根据主键获取用户信息失败");
+            }
+        } catch (Throwable ex) {
+            log.error("远程调用用户接口查询用户信息错误: 请求参数: {}", oldTokenInfo.getUserId());
+            throw new ServiceException(ex.getMessage());
+        }
+
+        CheckHeartBeatRespDTO actualRespDTO = CheckHeartBeatRespDTO.builder()
+                .debitCardId(debitCardActualMsgDTO.getDebitCardId())
+                .identityId(userActualMsgDTO.getIdentityId())
+                .accessToken(accessToken)
+                .build();
+        // 将用户 token 存入分布式缓存，hash表名是银行卡表的主键而不是银行卡号，保证唯一的同时保证敏感信息不外泄, 键是 token，值是序列化的返回对象
+        stringRedisTemplate.opsForHash().put(String.format(LOGIN_CACHE_KEY, oldTokenInfo.getCardId()), accessToken, JSON.toJSONString(actualRespDTO));
+        // 设置缓存过期时间为 10 分钟
+        // TODO 如果要修改这里的过期时间，记得去 gateway 和 common 服务里面的 JWTUtil 也改一下，保证缓存和token过期时间是差不多的
+        stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, oldTokenInfo.getCardId()), expiryTime, TimeUnit.SECONDS);
+        return actualRespDTO;
+    }
+
+    /**
+     * 通过银行卡号记录的主键拿到银行卡记录的脱敏信息
+     * @param cardId 银行卡号对应主键
+     * @return 脱敏的银行卡记录信息
+     */
+    private DebitCardActualMsgDTO getActualDebitCard(Long cardId) {
+        if (Objects.isNull(cardId)) {
+            throw new ServiceException("主键不能为空");
+        }
+        LambdaQueryWrapper<IdToDebitCardDO> queryWrapper = Wrappers.lambdaQuery(IdToDebitCardDO.class)
+                .eq(IdToDebitCardDO::getCardId, cardId);
+        IdToDebitCardDO idToDebitCardDO = idToDebitCardMapper.selectOne(queryWrapper);
+        LambdaQueryWrapper<DebitCardDO> wrapper = Wrappers.lambdaQuery(DebitCardDO.class)
+                .eq(DebitCardDO::getDebitCardId, idToDebitCardDO.getDebitCardId())
+                .eq(DebitCardDO::getCardStatus, 0);
+        DebitCardDO debitCardDO = debitCardMapper.selectOne(wrapper);
+        return DebitCardActualMsgDTO.builder()
+                .debitCardId(debitCardDO.getDebitCardId())
+                .pwd(debitCardDO.getPwd())
+                .phone(debitCardDO.getPhone())
+                .cardType(debitCardDO.getCardType())
+                .initalBalance(debitCardDO.getInitialBalance())
+                .accountBalance(debitCardDO.getAccountBalance())
+                .build();
     }
 }

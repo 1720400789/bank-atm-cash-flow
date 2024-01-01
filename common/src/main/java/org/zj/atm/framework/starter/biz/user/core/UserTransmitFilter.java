@@ -38,6 +38,7 @@ public class UserTransmitFilter implements Filter {
         try {
             filterChain.doFilter(servletRequest, servletResponse);
         } finally {
+            // 当前服务的线程退出后,删除上下文中该线程对应的用户信息
             UserContext.removeUser();
         }
     }

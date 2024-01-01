@@ -18,6 +18,11 @@ import java.util.Objects;
 
 /**
  * SpringCloud Gateway Token 拦截器
+ * 网关拦截器 用户上下文 以及 UserTransmitFilter 的关系是这样的
+ * 所有请求都要经过网关拦截器,如果请求前缀在黑名单上,则要尝试将 Token 中的信息放入请求头 header 中
+ * UserTranmitFilter 拦截请求,如果 header 中有 USER_ID_KEY,则将请求头中的信息解析进【用户上下文】
+ * 用户上下文 提供 setter 方法便于取得信息
+ * 此外，如果请求前缀在黑名单上，并且从请求头中拿不到 token，则判定为恶意请求，直接打回请求
  */
 @Component
 public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFactory<Config> {
@@ -61,9 +66,10 @@ public class TokenValidateGatewayFilterFactory extends AbstractGatewayFilterFact
                     httpHeaders.set(UserConstant.USER_ID_KEY, String.valueOf(userInfo.getUserId()));
                     httpHeaders.set(UserConstant.CARD_ID_KEY, String.valueOf(userInfo.getCardId()));
                     httpHeaders.set(UserConstant.REAL_NAME_KEY, URLEncoder.encode(userInfo.getRealName(), StandardCharsets.UTF_8));
-                    if (Objects.equals(requestPath, DELETION_PATH)) {
-                        httpHeaders.set(UserConstant.USER_TOKEN_KEY, token);
-                    }
+                    httpHeaders.set(UserConstant.USER_TOKEN_KEY, token);
+//                    if (Objects.equals(requestPath, DELETION_PATH)) {
+//                        httpHeaders.set(UserConstant.USER_TOKEN_KEY, token);
+//                    }
                 });
                 // 将上面创建的 ServerHttpRequest 实例 builder 设置给一个全新的 request 的副本，而这个副本其它状态和原来的实例是一模一样的
                 return chain.filter(exchange.mutate().request(builder.build()).build());

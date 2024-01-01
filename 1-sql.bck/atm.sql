@@ -48,3 +48,29 @@ CREATE TABLE `t_debit_card_goto` (
                                 PRIMARY KEY (`id`),
                                 UNIQUE KEY idx_uid_cid (`debit_card_id`, `identity_id`, `deletion_time`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+# 路由表，通过银行卡主键分片
+CREATE TABLE `t_id_to_debit_card_goto` (
+                                     `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+                                     `card_id` bigint unsigned DEFAULT NULL COMMENT '银行卡号对应主键',
+                                     `debit_card_id` varchar(64) DEFAULT NULL COMMENT '银行卡号',
+                                     `deletion_time` bigint(20) DEFAULT 0 COMMENT '注销时间戳',
+                                     `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+                                     `update_time` datetime DEFAULT NULL COMMENT '修改时间',
+                                     `del_flag` tinyint(1) DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+                                     PRIMARY KEY (`id`),
+                                     UNIQUE KEY idx_cid_deltime (`card_id`, `deletion_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+# 路由表，通过用户表主键分片
+CREATE TABLE `t_id_to_user_goto` (
+                                           `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '主键ID',
+                                           `user_id` bigint unsigned DEFAULT NULL COMMENT '用户身份证号对应主键',
+                                           `identity_id` varchar(64) DEFAULT NULL COMMENT '用户身份证号',
+                                           `deletion_time` bigint(20) DEFAULT 0 COMMENT '注销时间戳',
+                                           `create_time` datetime DEFAULT NULL COMMENT '创建时间',
+                                           `update_time` datetime DEFAULT NULL COMMENT '修改时间',
+                                           `del_flag` tinyint(1) DEFAULT 0 COMMENT '删除标识 0：未删除 1：已删除',
+                                           PRIMARY KEY (`id`),
+                                           UNIQUE KEY idx_uid_deltime (`user_id`, `deletion_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

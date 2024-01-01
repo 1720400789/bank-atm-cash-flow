@@ -39,6 +39,15 @@ public final class Results {
     }
 
     /**
+     * 构造带返回数据的成功响应
+     */
+    public static <T> Result<T> failure(T data) {
+        return new Result<T>()
+                .setCode(BaseErrorCode.SERVICE_ERROR.code())
+                .setData(data);
+    }
+
+    /**
      * 通过 {@link AbstractException} 构建失败响应
      */
     public static Result<Void> failure(AbstractException abstractException) {

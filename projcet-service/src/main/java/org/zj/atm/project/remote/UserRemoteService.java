@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.project.remote.dto.req.UserRegisterReqDTO;
+import org.zj.atm.project.remote.dto.resp.UserActualMsgDTO;
 import org.zj.atm.project.remote.dto.resp.UserAnonymizedMsg;
 
 /**
@@ -26,5 +27,11 @@ public interface UserRemoteService {
      */
     @GetMapping("/api/atm/user-service/v1/get-anonymized")
     Result<UserAnonymizedMsg> getAnonymizedMsg(@RequestParam("identityId") String identityId);
+
+    /**
+     * 通过身份证号对应主键拿到真实信息
+     */
+    @GetMapping("/api/atm/user-service/v1/get-actual-by-id")
+    Result<UserActualMsgDTO> getActualMsgById(@RequestParam("userId") Long userId);
 
 }

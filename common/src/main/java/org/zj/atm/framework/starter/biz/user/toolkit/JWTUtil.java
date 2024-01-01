@@ -21,7 +21,8 @@ import static org.zj.atm.framework.starter.bases.constant.UserConstant.*;
 @Slf4j
 public final class JWTUtil {
 
-    private static final long EXPIRATION = 600L;
+    // token 有效期为 65 秒
+    private static final long EXPIRATION = 100000L;
     public static final String TOKEN_PREFIX = "Bearer ";
     public static final String ISS = "ATM";
     public static final String SECRET = "SecretKey039245678901232039487623456783092349288901402967890140939827";

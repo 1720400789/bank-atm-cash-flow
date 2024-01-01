@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.convention.result.Results;
 import org.zj.atm.user.dto.req.UserRegisterReqDTO;
+import org.zj.atm.user.dto.resp.UserActualMsgDTO;
 import org.zj.atm.user.dto.resp.UserAnonymizedMsg;
 import org.zj.atm.user.service.UserService;
 
@@ -27,13 +28,20 @@ public class UserInfoController {
      */
     @PostMapping("/v1/register")
     public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam) {
-        userService.register(requestParam);
-        return Results.success();
+        return userService.register(requestParam);
     }
 
     @GetMapping("/v1/get-anonymized")
     public Result<UserAnonymizedMsg> getAnonymized(@RequestParam("identityId") String identityId) {
-        return Results.success(userService.getAnonymized(identityId));
+        return userService.getAnonymized(identityId);
+    }
+
+    /**
+     * 通过身份证号对应主键拿到真实信息
+     */
+    @GetMapping("/v1/get-actual-by-id")
+    Result<UserActualMsgDTO> getActualMsgById(@RequestParam("userId") Long userId) {
+        return userService.getActualMsgById(userId);
     }
 
 }

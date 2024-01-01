@@ -20,9 +20,9 @@ import static org.zj.atm.gateway.common.core.UserConstant.*;
 public final class JWTUtil {
 
     /**
-     * 60 * 10 十分钟
+     * token 过期时间
      */
-    private static final long EXPIRATION = 600L;
+    private static final long EXPIRATION = 100000L;
     public static final String TOKEN_PREFIX = "Bearer ";
     public static final String ISS = "ATM";
     public static final String SECRET = "SecretKey039245678901232039487623456783092349288901402967890140939827";

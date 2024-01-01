@@ -16,7 +16,7 @@ import org.zj.atm.project.dao.serializers.NameDesensitizationSerializer;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class DebitCardLoginRespDTO {
+public class CheckHeartBeatRespDTO {
 
     /**
      * 身份证号
@@ -40,6 +40,4 @@ public class DebitCardLoginRespDTO {
      * 返回给前端的令牌 Token
      */
     private String accessToken;
-
-
 }

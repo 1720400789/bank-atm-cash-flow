@@ -29,6 +29,16 @@ rules:
           standard:
             shardingColumn: debit_card_id
             shardingAlgorithmName: debit_card_table_hash_mod
+      t_id_to_debit_card_goto:
+        actualDataNodes: ds_${0}.t_id_to_debit_card_goto_${0}
+        databaseStrategy:
+          standard:
+            shardingColumn: card_id
+            shardingAlgorithmName: debit_card_database_hash_mod
+        tableStrategy:
+          standard:
+            shardingColumn: card_id
+            shardingAlgorithmName: debit_card_table_hash_mod
     shardingAlgorithms:
       debit_card_database_hash_mod:
         type: HASH_MOD
@@ -67,6 +77,11 @@ rules:
             encryptorName: common_encryptor
           identity_id:
             cipherColumn: identity_id
+            encryptorName: common_encryptor
+      t_id_to_debit_card_goto:
+        columns:
+          debit_card_id:
+            cipherColumn: debit_card_id
             encryptorName: common_encryptor
     encryptors:
       common_encryptor:

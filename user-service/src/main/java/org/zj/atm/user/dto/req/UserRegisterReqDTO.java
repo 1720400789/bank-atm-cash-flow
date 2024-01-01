@@ -14,9 +14,18 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserRegisterReqDTO {
 
+    /**
+     * 真实姓名
+     */
     private String realName;
 
+    /**
+     * 身份证号
+     */
     private String identityId;
 
+    /**
+     * 住址
+     */
     private String address;
 }

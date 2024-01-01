@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import org.zj.atm.project.dao.enrity.DebitCardDO;
 import org.zj.atm.project.dto.req.DebitCardLoginReqDTO;
 import org.zj.atm.project.dto.req.DebitCardRegisterReqDTO;
+import org.zj.atm.project.dto.resp.CheckHeartBeatRespDTO;
 import org.zj.atm.project.dto.resp.DebitCardLoginRespDTO;
 import org.zj.atm.project.dto.resp.DebitCardRegisterRespDTO;
 
@@ -17,4 +18,6 @@ public interface DebitCardService extends IService<DebitCardDO> {
     DebitCardRegisterRespDTO register(DebitCardRegisterReqDTO requestParam);
 
     DebitCardLoginRespDTO login(DebitCardLoginReqDTO requestParam);
+
+    CheckHeartBeatRespDTO checkHeartBeat();
 }

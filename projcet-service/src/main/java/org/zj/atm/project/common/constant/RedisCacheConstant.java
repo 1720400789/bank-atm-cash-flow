@@ -25,4 +25,9 @@ public class RedisCacheConstant {
      * 用户插卡登录的键
      */
     public static final String LOGIN_CACHE_KEY = "atm:debit-card:login:%d";
+
+    /**
+     * 记录登录失败次数的键
+     */
+    public static final String LOGIN_FAIL_COUNT = "atm:debit-card:login-fail:count:%d";
 }

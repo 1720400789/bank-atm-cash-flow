@@ -38,5 +38,4 @@ spring:
             - name: TokenValidate
               args:
                 blackPathPre:
-                  - /api/order-service/order/ticket/query
-                  - /api/order-service/order/ticket/self/page
+                  - /api/atm/project-service/has-logged-in/v1/check-heartbeat

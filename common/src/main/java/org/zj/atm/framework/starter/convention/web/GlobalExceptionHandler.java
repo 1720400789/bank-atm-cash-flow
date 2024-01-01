@@ -14,6 +14,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.zj.atm.framework.starter.convention.errocode.BaseErrorCode;
 import org.zj.atm.framework.starter.convention.exception.AbstractException;
+import org.zj.atm.framework.starter.convention.exception.ClientException;
+import org.zj.atm.framework.starter.convention.exception.ServiceException;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.convention.result.Results;
 
@@ -46,7 +48,7 @@ public class GlobalExceptionHandler {
     /**
      * 拦截应用内抛出的我们自定义的异常
      */
-    @ExceptionHandler(value = {AbstractException.class})
+    @ExceptionHandler(value = {ClientException.class, ServiceException.class})
     public Result abstractException(HttpServletRequest request, AbstractException ex) {
         if (ex.getCause() != null) {
             log.error("[{}] {} [ex] {}", request.getMethod(), request.getRequestURL().toString(), ex.toString(), ex.getCause());
