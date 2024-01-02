@@ -9,6 +9,8 @@ import org.zj.atm.project.dao.serializers.DebitCardIdDesensitizationSerializer;
 import org.zj.atm.project.dao.serializers.IdCardDesensitizationSerializer;
 import org.zj.atm.project.dao.serializers.NameDesensitizationSerializer;
 
+import java.math.BigDecimal;
+
 /**
  * 用户使用银行卡登录返回数据实体类
  */
@@ -21,20 +23,25 @@ public class DebitCardLoginRespDTO {
     /**
      * 身份证号
      */
-    @JsonSerialize(using = IdCardDesensitizationSerializer.class)
+//    @JsonSerialize(using = IdCardDesensitizationSerializer.class)
     private String identityId;
 
     /**
      * 真实姓名
      */
-    @JsonSerialize(using = NameDesensitizationSerializer.class)
+//    @JsonSerialize(using = NameDesensitizationSerializer.class)
     private String realName;
 
     /**
      * 银行卡号
      */
-    @JsonSerialize(using = DebitCardIdDesensitizationSerializer.class)
+//    @JsonSerialize(using = DebitCardIdDesensitizationSerializer.class)
     private String debitCardId;
+
+    /**
+     * 账户余额
+     */
+    private BigDecimal accountBalance;
 
     /**
      * 返回给前端的令牌 Token

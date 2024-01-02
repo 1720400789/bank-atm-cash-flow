@@ -22,6 +22,13 @@ public class RedisCacheConstant {
     public static final String LOCK_DEBIT_CARD_WRITE_KEY = "atm:debit-card:write";
 
     /**
+     * 针对银行卡记录的读写锁
+     * 读锁共享
+     * 写锁独占
+     */
+    public static final String LOCK_DEBIT_READ_WRITE_KEY = "atm:debit-card:read-write:%d";
+
+    /**
      * 用户插卡登录的键
      */
     public static final String LOGIN_CACHE_KEY = "atm:debit-card:login:%d";

@@ -1,7 +1,7 @@
 package org.zj.atm.project.service.impl;
 
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import org.zj.atm.project.dao.enrity.DebitCardGotoDO;
+import org.zj.atm.project.dao.entity.DebitCardGotoDO;
 import org.zj.atm.project.service.DebitCardGotoService;
 import org.zj.atm.project.dao.mapper.DebitCardGotoMapper;
 import org.springframework.stereotype.Service;

@@ -1,6 +1,6 @@
 package org.zj.atm.project.service;
 
-import org.zj.atm.project.dao.enrity.DebitCardGotoDO;
+import org.zj.atm.project.dao.entity.DebitCardGotoDO;
 import com.baomidou.mybatisplus.extension.service.IService;
 
 /**

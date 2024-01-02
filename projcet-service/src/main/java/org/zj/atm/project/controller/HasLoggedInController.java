@@ -5,9 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.convention.result.Results;
+import org.zj.atm.project.dto.req.DebitCardDepOrWdlDTO;
 import org.zj.atm.project.dto.req.DebitCardLoginReqDTO;
 import org.zj.atm.project.dto.req.DebitCardRegisterReqDTO;
 import org.zj.atm.project.dto.resp.CheckHeartBeatRespDTO;
+import org.zj.atm.project.dto.resp.DebitCardDepOrWdlRecordDTO;
 import org.zj.atm.project.dto.resp.DebitCardLoginRespDTO;
 import org.zj.atm.project.dto.resp.DebitCardRegisterRespDTO;
 import org.zj.atm.project.service.DebitCardService;
@@ -33,6 +35,16 @@ public class HasLoggedInController {
         return Results.success(debitCardService.checkHeartBeat());
     }
 
-//    @GetMapping("/")
+    @PostMapping("/v1/deposit-or-withdrawal")
+    public Result<DebitCardDepOrWdlRecordDTO> depositOrWithdrawal(@RequestBody DebitCardDepOrWdlDTO requestParam) {
+        return Results.success(debitCardService.depositOrWithdrawal(requestParam));
+    }
+
+    // TODO 转账接口
+    @PostMapping("/v1/transfer")
+    public Result<Void> cashTransfer(@RequestBody DebitCardDepOrWdlDTO requestParam) {
+        debitCardService.depositOrWithdrawal(requestParam);
+        return Results.success();
+    }
 
 }

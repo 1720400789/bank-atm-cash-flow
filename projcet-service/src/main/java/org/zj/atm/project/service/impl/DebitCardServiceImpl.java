@@ -6,10 +6,11 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.google.common.collect.Lists;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RReadWriteLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -21,16 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 import org.zj.atm.framework.starter.biz.user.core.UserContext;
 import org.zj.atm.framework.starter.biz.user.core.UserInfoDTO;
 import org.zj.atm.framework.starter.biz.user.toolkit.JWTUtil;
+import org.zj.atm.framework.starter.convention.exception.ClientException;
 import org.zj.atm.framework.starter.convention.exception.RemoteException;
 import org.zj.atm.framework.starter.convention.exception.ServiceException;
 import org.zj.atm.framework.starter.convention.result.Result;
 import org.zj.atm.framework.starter.designpattern.chain.AbstractChainContext;
-import org.zj.atm.project.dao.enrity.DebitCardDO;
-import org.zj.atm.project.dao.enrity.DebitCardGotoDO;
-import org.zj.atm.project.dao.enrity.IdToDebitCardDO;
+import org.zj.atm.project.dao.entity.DebitCardDO;
+import org.zj.atm.project.dao.entity.DebitCardGotoDO;
+import org.zj.atm.project.dao.entity.DepWdlRecordDO;
+import org.zj.atm.project.dao.entity.IdToDebitCardDO;
 import org.zj.atm.project.dao.mapper.DebitCardGotoMapper;
 import org.zj.atm.project.dao.mapper.DebitCardMapper;
+import org.zj.atm.project.dao.mapper.DepWdlRecordMapper;
 import org.zj.atm.project.dao.mapper.IdToDebitCardMapper;
+import org.zj.atm.project.dto.req.DebitCardDepOrWdlDTO;
 import org.zj.atm.project.dto.req.DebitCardLoginReqDTO;
 import org.zj.atm.project.dto.req.DebitCardRegisterReqDTO;
 import org.zj.atm.project.dto.resp.*;
@@ -42,13 +47,13 @@ import org.zj.atm.project.service.DebitCardService;
 import org.zj.atm.project.toolkit.IOS15DebitCardCreate;
 import java.io.PrintWriter;
 import java.math.BigDecimal;
-import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
-import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_CACHE_KEY;
-import static org.zj.atm.project.common.constant.RedisCacheConstant.LOGIN_FAIL_COUNT;
+
+import static org.zj.atm.project.common.constant.RedisCacheConstant.*;
 import static org.zj.atm.project.common.enums.DebitCardErrorCodeEnum.*;
 import static org.zj.atm.project.common.enums.DebitChainMarkEnum.DEBIT_CARD_LOGIN_FILTER;
 import static org.zj.atm.project.common.enums.DebitChainMarkEnum.DEBIT_CARD_REGISTER_FILTER;
@@ -88,6 +93,8 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
     private final DebitCardGotoMapper debitCardGotoMapper;
 
     private final IdToDebitCardMapper idToDebitCardMapper;
+
+    private final DepWdlRecordMapper depWdlRecordMapper;
 
     private final StringRedisTemplate stringRedisTemplate;
 
@@ -296,6 +303,7 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
                 .debitCardId(debitCardDO.getDebitCardId())
                 .identityId(debitCardGotoDO.getIdentityId())
                 .realName(userAnonymizedMsg.getRealName())
+                .accountBalance(debitCardDO.getAccountBalance())
                 // token 信息包含了用户插卡时的userId和银行卡id，不把其它敏感信息给 token，防止泄露
                 .accessToken(accessToken)
                 .build();
@@ -361,6 +369,116 @@ public class DebitCardServiceImpl extends ServiceImpl<DebitCardMapper, DebitCard
         // TODO 如果要修改这里的过期时间，记得去 gateway 和 common 服务里面的 JWTUtil 也改一下，保证缓存和token过期时间是差不多的
         stringRedisTemplate.expire(String.format(LOGIN_CACHE_KEY, oldTokenInfo.getCardId()), expiryTime, TimeUnit.SECONDS);
         return actualRespDTO;
+    }
+
+    /**
+     * 存取款接口实现
+     * @param requestParam 存取款参数
+     */
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public DebitCardDepOrWdlRecordDTO depositOrWithdrawal(DebitCardDepOrWdlDTO requestParam) {
+        // 如果操作金额为空或操作金额不在限制内，则抛出异常
+        if (Objects.isNull(requestParam.getOperationAmount()) ||
+                requestParam.getOperationAmount().compareTo(new BigDecimal("100")) < 0 ||
+                requestParam.getOperationAmount().compareTo(new BigDecimal("10000")) > 0 ||
+                requestParam.getOperationAmount().divideAndRemainder(new BigDecimal("100"))[1].compareTo(BigDecimal.ZERO) != 0
+        ) {
+            throw new ClientException(OPERATION_AMOUNT_ERROR);
+        }
+        if (Objects.isNull(requestParam.getOperationType()) ||
+                (requestParam.getOperationType() != 1 && requestParam.getOperationType() != 2)) {
+            throw new ClientException("参数错误！");
+        }
+
+        // 用户表主键
+        Long userId = UserContext.getUserId();
+        Result<UserActualMsgDTO> result;
+        UserActualMsgDTO userActualMsgDTO = null;
+        try {
+            result = userRemoteService.getActualMsgById(userId);
+            if (!result.isSuccess() || Objects.isNull(userActualMsgDTO = result.getData())) {
+                throw new RemoteException("用户服务远程调用，根据主键获取用户信息失败");
+            }
+        } catch (Throwable ex) {
+            log.error("远程调用用户接口查询用户信息错误: 请求参数: {}", UserContext.getUserId());
+            throw new ServiceException(ex.getMessage());
+        }
+        // 排他写锁
+        // TODO 这里写银行卡表得加【写锁】，对应的，其它设计读银行卡表的业务记得添加【共享读锁】
+        // 这里选用 redission 实现的读写锁
+        RReadWriteLock readWriteLock = redissonClient.getReadWriteLock(String.format(LOCK_DEBIT_READ_WRITE_KEY, UserContext.getCardId()));
+        RLock rLock = readWriteLock.writeLock();
+        if (!rLock.tryLock()) {
+            // 如果获取写锁失败，则说明当前账户正在被查询
+            throw new ServiceException("有人正在偷看当前账户。。。");
+        }
+        try {
+            Date currentTime = new Date();
+            LambdaQueryWrapper<DebitCardDO> queryWrapper = Wrappers.lambdaQuery(DebitCardDO.class)
+                    .eq(DebitCardDO::getIdentityId, userActualMsgDTO.getIdentityId())
+                    .eq(DebitCardDO::getId, UserContext.getCardId());
+            DebitCardDO debitCardDO = debitCardMapper.selectOne(queryWrapper);
+            LambdaUpdateWrapper<DebitCardDO> wrapper = Wrappers.lambdaUpdate(DebitCardDO.class)
+                    .eq(DebitCardDO::getIdentityId, userActualMsgDTO.getIdentityId())
+                    .eq(DebitCardDO::getId, UserContext.getCardId());
+            DebitCardDO nextDebitCardDO = null;
+            // 如果是存款操作
+            if (requestParam.getOperationType() == 1) {
+                if (Objects.isNull(debitCardDO.getAccountBalance())) {
+                    debitCardDO.setAccountBalance(new BigDecimal("0"));
+                }
+                nextDebitCardDO = DebitCardDO.builder()
+                        .accountBalance(debitCardDO.getAccountBalance().add(requestParam.getOperationAmount()))
+                        .build();
+            } else {
+                if (requestParam.getOperationAmount().compareTo(debitCardDO.getAccountBalance()) > 0) {
+                    throw new ClientException("你取钱取得太多了!");
+                }
+                // 如果是取款操作
+                nextDebitCardDO = DebitCardDO.builder()
+                        .accountBalance(debitCardDO.getAccountBalance().subtract(requestParam.getOperationAmount()))
+                        .build();
+            }
+            int update = debitCardMapper.update(nextDebitCardDO, wrapper);
+            if (update != 1) {
+                throw new ServiceException("存款或取款服务出错！请稍后重试");
+            }
+
+            DepWdlRecordDO build = DepWdlRecordDO.builder()
+                    .debitCardId(debitCardDO.getDebitCardId())
+                    .identityId(debitCardDO.getIdentityId())
+                    .operationType(requestParam.getOperationType())
+                    .operationAmount(requestParam.getOperationAmount())
+                    .operationTime(currentTime)
+                    .build();
+            depWdlRecordMapper.insert(build);
+
+            LambdaQueryWrapper<DepWdlRecordDO> eq = Wrappers.lambdaQuery(DepWdlRecordDO.class)
+                    .eq(DepWdlRecordDO::getDebitCardId, debitCardDO.getDebitCardId())
+                    .orderByDesc(DepWdlRecordDO::getOperationTime);
+            DepWdlRecordDO depWdlRecordDO = depWdlRecordMapper.selectList(eq).get(0);
+
+            return DebitCardDepOrWdlRecordDTO.builder()
+                    .id(depWdlRecordDO.getId())
+                    .DebitCardId(debitCardDO.getDebitCardId())
+                    .identityId(debitCardDO.getIdentityId())
+                    .realName(userActualMsgDTO.getRealName())
+                    .operationAmount(requestParam.getOperationAmount())
+                    .operationTime(currentTime)
+                    .build();
+        } finally {
+            rLock.unlock();
+        }
+    }
+
+    /**
+     * 检查 token 是否过期
+     * @return 是否过期
+     */
+    private boolean checkTokenExpiraTime() {
+        UserInfoDTO userInfoDTO = JWTUtil.parseJwtToken(UserContext.getToken());
+        return !Objects.isNull(userInfoDTO);
     }
 
     /**

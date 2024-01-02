@@ -59,6 +59,8 @@ public enum DebitCardErrorCodeEnum implements IErrorCode {
 
     DEBIT_CARD_LOGIN_MATCH_PWD_FAIL("A006106", "密码错误"),
 
+    OPERATION_AMOUNT_ERROR("A006107", "恶意请求，操作金额异常"),
+
     DEBIT_PREFIX_ERROR("B006102", "请管理员检测本行银行卡前缀"),
 
     DEBIT_APPLY_BLOCK("B006100", "申请卡号拥塞，请稍后再试...");
